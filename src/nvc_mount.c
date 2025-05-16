@@ -34,6 +34,7 @@ static char *mount_device(struct error *, const char *, const struct nvc_contain
 static char *mount_ipc(struct error *, const char *, const struct nvc_container *, const char *);
 static char *mount_procfs(struct error *, const char *, const struct nvc_container *);
 static char *mount_procfs_gpu(struct error *, const char *, const struct nvc_container *, const char *);
+static char *mount_procfs_uvm_gpu(struct error *, const char *, const struct nvc_container *, const struct nvc_device_node *);
 static char *mount_procfs_mig(struct error *, const char *, const struct nvc_container *, const char *);
 static char *mount_app_profile(struct error *, const struct nvc_container *);
 static int  update_app_profile(struct error *, const struct nvc_container *, dev_t);
@@ -457,6 +458,52 @@ mount_procfs_gpu(struct error *err, const char *root, const struct nvc_container
 }
 
 static char *
+mount_procfs_uvm_gpu(struct error *err, const char *root, const struct nvc_container *cnt, const struct nvc_device_node *dev)
+{
+        printf("=== device id: %d, path: %s\n", dev->id, dev->path);
+        return (NULL);
+        /*char src[PATH_MAX];
+        char dst[PATH_MAX] = {0};
+        char *gpu = NULL;
+        char *mnt = NULL;
+        mode_t mode;
+
+        for (int off = 0;; off += 4) {
+                // XXX Check if the driver procfs uses 32-bit or 16-bit PCI domain
+                if (xasprintf(err, &gpu, "%s/gpus/%s", NV_UVM_PROC_DRIVER, busid + off) < 0)
+                        return (NULL);
+                if (path_join(err, src, root, gpu) < 0)
+                        goto fail;
+                if (path_resolve_full(err, dst, cnt->cfg.rootfs, gpu) < 0)
+                        goto fail;
+                if (file_mode(err, src, &mode) == 0)
+                        break;
+                if (err->code != ENOENT || off != 0)
+                        goto fail;
+                *dst = '\0';
+                free(gpu);
+                gpu = NULL;
+        }
+        if (file_create(err, dst, NULL, cnt->uid, cnt->gid, mode) < 0)
+                goto fail;
+
+        log_infof("mounting %s at %s", src, dst);
+        if (xmount(err, src, dst, NULL, MS_BIND, NULL) < 0)
+                goto fail;
+        if (xmount(err, NULL, dst, NULL, MS_BIND|MS_REMOUNT | MS_RDONLY|MS_NODEV|MS_NOSUID|MS_NOEXEC, NULL) < 0)
+                goto fail;
+        if ((mnt = xstrdup(err, dst)) == NULL)
+                goto fail;
+        free(gpu);
+        return (mnt);
+
+ fail:
+        free(gpu);
+        unmount(dst);
+        return (NULL);*/
+}
+
+static char *
 mount_procfs_mig(struct error *err, const char *root, const struct nvc_container *cnt, const char *caps_path)
 {
         // Initialize local variables.
@@ -608,6 +655,7 @@ device_mount_native(struct nvc_context *ctx, const struct nvc_container *cnt, co
                 if (update_app_profile(&ctx->err, cnt, dev->node.id) < 0)
                         goto fail;
         }
+        mount_procfs_uvm_gpu(&ctx->err, ctx->cfg.root, cnt, dev);
         if (!(cnt->flags & OPT_NO_CGROUPS)) {
                 if (setup_device_cgroup(&ctx->err, cnt, dev->node.id) < 0)
                         goto fail;
